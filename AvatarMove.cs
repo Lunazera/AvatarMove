@@ -16,6 +16,7 @@ namespace AvatarMoveLayer
 
         // Settings for Movement
         public static VNyanVector3 avaDirection = new VNyanVector3();
+        public static float avaDirectionAngle = 0.0f;
         public static VNyanVector3 avaPosition = new VNyanVector3();
         public static float avaCurrentSpeed = 0;
         public static float avaCurrentStrafe = 0;
@@ -40,6 +41,8 @@ namespace AvatarMoveLayer
         public Dictionary<int, VNyanVector3> BoneScales;
         public VNyanVector3 RootPos;
         public VNyanQuaternion RootRot;
+
+        public Quaternion UnityRootRotation;
 
         // VNyan Get Methods, VNyan uses these to get the pose after doUpdate()
         VNyanVector3 IPoseLayer.getBonePosition(int i)
@@ -136,34 +139,57 @@ namespace AvatarMoveLayer
                     avaRotationSpeed,
                     AvatarMoveSettings.avaRotationAccel * Time.deltaTime);
             }
+            
+            // Rotation //
+
+            // First get our Current Root Rotation's VNyanQuaternion into Unity Quaternion
+            UnityRootRotation = VNyanExtra.QuaternionMethods.convertQuaternionV2U(RootRot);
 
             // Additively change rotation by speed
             AvatarMoveSettings.avaRotation += avaRotationSpeed;
 
-            // Apply rotation to hip bone
-            VNyanExtra.QuaternionMethods.rotateByEulerUnity(BoneRotations[0], 0, AvatarMoveSettings.avaRotation, 0);
+            // Create a rotation that'll rotate around by our desired speed
+            Quaternion UnityRotateTo = Quaternion.AngleAxis(AvatarMoveSettings.avaRotation, Vector3.up);
+
+            // Next, apply rotation
+            Quaternion UnityNewRotation = UnityRootRotation * UnityRotateTo;
+
+            // Convert back into VNyanQuaternion and save to Hip bone
+            RootRot = VNyanExtra.QuaternionMethods.convertQuaternionU2V(UnityNewRotation);
+
+            // Direction vector //
+
+            // Now, get the current Hip bone rotation to figure out our direction
+            // Combine our Root rotation with Hip rotation
+
+            Quaternion combinedRotation = VNyanExtra.QuaternionMethods.convertQuaternionV2U(BoneRotations[0]) * UnityNewRotation;
+            AvatarMoveSettings.avaDirectionAngle = combinedRotation.eulerAngles.y;
 
             // Calculate move direction vector from rotation
-            AvatarMoveSettings.avaDirection.X = Mathf.Sin(AvatarMoveSettings.avaRotation * Mathf.Deg2Rad);
+            AvatarMoveSettings.avaDirection.X = Mathf.Sin(AvatarMoveSettings.avaDirectionAngle * Mathf.Deg2Rad);
             AvatarMoveSettings.avaDirection.Y = 0;
-            AvatarMoveSettings.avaDirection.Z = Mathf.Cos(AvatarMoveSettings.avaRotation * Mathf.Deg2Rad);
+            AvatarMoveSettings.avaDirection.Z = Mathf.Cos(AvatarMoveSettings.avaDirectionAngle * Mathf.Deg2Rad);
 
             // Calculate strafing component
-            float strafeX = Mathf.Sin((AvatarMoveSettings.avaRotation-90) * Mathf.Deg2Rad) * AvatarMoveSettings.avaCurrentStrafe;
-            float strafeZ = Mathf.Cos((AvatarMoveSettings.avaRotation-90) * Mathf.Deg2Rad) * AvatarMoveSettings.avaCurrentStrafe;
+            float strafeX = Mathf.Sin((AvatarMoveSettings.avaDirectionAngle - 90) * Mathf.Deg2Rad) * AvatarMoveSettings.avaCurrentStrafe;
+            float strafeZ = Mathf.Cos((AvatarMoveSettings.avaDirectionAngle - 90) * Mathf.Deg2Rad) * AvatarMoveSettings.avaCurrentStrafe;
+
+            // Movement //
 
             // Apply speed to direction (save new position in our position vector)
             AvatarMoveSettings.avaPosition.X += AvatarMoveSettings.avaDirection.X * AvatarMoveSettings.avaCurrentSpeed + strafeX;
             AvatarMoveSettings.avaPosition.Z += AvatarMoveSettings.avaDirection.Z * AvatarMoveSettings.avaCurrentSpeed + strafeZ;
 
             // Apply movement to Avatar position (apply position vector to hip position)
-            BonePositions[0].X += AvatarMoveSettings.avaPosition.X;
-            BonePositions[0].Z += AvatarMoveSettings.avaPosition.Z;
+            RootPos.X += AvatarMoveSettings.avaPosition.X;
+            RootPos.Z += AvatarMoveSettings.avaPosition.Z;
+
+            // Save/Report Values //
 
             // Report current Position and Rotation to VNyan
-            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarPosX", AvatarMoveSettings.avaPosition.X);
-            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarPosZ", AvatarMoveSettings.avaPosition.Z);
-            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarRot", AvatarMoveSettings.avaRotation);
+            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarPosX", RootPos.X);
+            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarPosZ", RootPos.Z);
+            VNyanInterface.VNyanInterface.VNyanParameter.setVNyanParameterFloat("AvatarRot", AvatarMoveSettings.avaDirectionAngle);
         }
     }
 }

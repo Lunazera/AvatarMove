@@ -156,6 +156,23 @@ namespace VNyanExtra
             return q;
         }
 
+        public static Quaternion convertQuaternionV2U(VNyanQuaternion q)
+        {
+            Quaternion unityQ = new Quaternion(q.X, q.Y, q.Z, q.W);
+            return unityQ;
+        }
+
+        public static VNyanQuaternion convertQuaternionU2V(Quaternion q)
+        {
+            VNyanQuaternion p = new VNyanQuaternion();
+            p.X = q.x;
+            p.Y = q.y;
+            p.Z = q.z;
+            p.W = q.w;
+
+            return p;
+        }
+
 
         public static Dictionary<int, VNyanQuaternion> loopThroughBones(Dictionary<int, VNyanQuaternion> BoneRotations)
         {
